@@ -44,6 +44,12 @@ async function run() {
       res.send(result)
     })
 
+    app.post('/ad-post', async(req,res)=>{
+      const post = req.body
+      const result = await postCollection.insertOne(post)
+      res.send(result);
+    })
+
 
 
     app.post('/users', async (req,res)=>{
