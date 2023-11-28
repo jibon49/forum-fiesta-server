@@ -38,6 +38,7 @@ async function run() {
     const postCollection = client.db("forumFiesta").collection("posts");
     const tagCollection = client.db("forumFiesta").collection("tags")
     const userCollection = client.db("forumFiestaUsers").collection("users")
+    const commentCollection = client.db("forumFiesta").collection("comments")
 
 
 
@@ -55,10 +56,28 @@ async function run() {
 
     app.get('/posts/:id', async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) }
       const result = await postCollection.findOne(query)
       res.send(result);
     });
+
+
+
+    app.patch('/posts/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedSubmitted = req.body;
+      console.log("upvotes", updatedSubmitted);
+
+      const updateDoc = {
+        $set: {
+          'votesCount.upvotes': updatedSubmitted.upvotes,
+          'votesCount.downvotes': updatedSubmitted.downvotes
+        },
+      };
+      const result = await postCollection.updateOne(filter, updateDoc);
+      res.send(result)
+    })
 
 
     app.get('/my-posts', async (req, res) => {
@@ -74,9 +93,9 @@ async function run() {
 
     })
 
-    app.delete('/posts/:id', async(req,res)=>{
+    app.delete('/posts/:id', async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) }
       const result = await postCollection.deleteOne(query);
       res.send(result)
     })
@@ -99,17 +118,58 @@ async function run() {
 
     app.post('/users', async (req, res) => {
       const user = req.body;
-      console.log(user)
+      const query = { userEmail: user.email }
+      const existingUser = await userCollection.findOne(query)
+      if (existingUser) {
+        return res.send({ message: 'user already exist', insertedId: null })
+      }
       const result = await userCollection.insertOne(user);
       res.send(result)
     })
 
-    app.get('/users/:email', async(req,res)=>{
+    app.get('/users/:email', async (req, res) => {
       const email = req.params.email;
-      const query = {userMail : email}
+      const query = { userMail: email }
       const result = await userCollection.findOne(query)
       res.send(result)
     })
+
+    app.patch('/users/admin/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          userRole: 'admin'
+        }
+      }
+      const result = await userCollection.updateOne(filter, updatedDoc)
+      res.send(result);
+    })
+
+
+
+
+    // comments related
+    app.post('/comments', async (req, res) => {
+      const comment = req.body;
+      const result = await commentCollection.insertOne(comment)
+      res.send(result)
+    })
+
+    app.get('/comments', async (req, res) => {
+      let query = {}
+
+      if (req.query?.postId) {
+        query = {
+          'postInfo': req.query.postId,
+        }
+        const result = await commentCollection.find(query).toArray();
+        res.send(result)
+      }
+
+    })
+
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
@@ -119,6 +179,10 @@ async function run() {
     // await client.close();
   }
 }
+
+
+
+
 run().catch(console.dir);
 
 
