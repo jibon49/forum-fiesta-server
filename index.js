@@ -39,6 +39,7 @@ async function run() {
     const tagCollection = client.db("forumFiesta").collection("tags")
     const userCollection = client.db("forumFiestaUsers").collection("users")
     const commentCollection = client.db("forumFiesta").collection("comments")
+    const announcementCollection = client.db("forumFiesta").collection("announcement")
 
 
     //JWT related
@@ -72,7 +73,6 @@ async function run() {
 
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
-      console.log(email)
       const query = { userMail: email };
       const user = await userCollection.findOne(query);
       const isAdmin = user?.userRole === 'admin';
@@ -134,6 +134,20 @@ async function run() {
 
     })
 
+    app.get('/my-posts/count', async (req, res) => {
+      let query = {}
+
+      if (req.query?.email) {
+        query = {
+          'author.email': req.query.email,
+        }
+        const result = await postCollection.find(query).toArray();
+        const postCount = result.length;
+        res.send({ postCount });
+      }
+    });
+
+
     app.delete('/posts/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
@@ -152,14 +166,13 @@ async function run() {
 
 
     // user related
-    app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+    app.get('/users', verifyToken, async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result)
     })
 
     app.post('/users', async (req, res) => {
       const user = req.body;
-      console.log(user)
       const query = { userMail: user.userMail }
       const existingUser = await userCollection.findOne(query)
       if (existingUser) {
@@ -175,6 +188,20 @@ async function run() {
       const result = await userCollection.findOne(query)
       res.send(result)
     })
+
+    app.get('/users/membership/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { userMail: email };
+      const user = await userCollection.findOne(query);
+    
+      if (user) {
+        const  membership  = user.membership;
+        res.send({ membership });
+      } else {
+        res.status(404).send({ error: 'User not found' });
+      }
+    });
+    
 
     app.get('/users/admin/:email', verifyToken, async (req, res) => {
       const email = req.params.email;
@@ -226,11 +253,24 @@ async function run() {
     })
 
 
+    //announcement
+
+    app.post('/ad-announcement', async (req, res) => {
+      const announcement = req.body;
+      const result = await announcementCollection.insertOne(announcement)
+      res.send(result)
+    })
+
+    app.get('/announcement', async (req, res) => {
+      const result = await announcementCollection.find().toArray()
+      res.send(result)
+    })
+
+
 
     // stripe
     app.post('/create-payment-intent', async (req, res) => {
-      const {price} = req.body;
-      console.log(price)
+      const { price } = req.body;
       const amount = parseInt(price * 100);
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
@@ -255,7 +295,7 @@ async function run() {
       const result = await userCollection.updateOne(filter, updatedDoc)
       res.send(result);
     });
-    
+
 
 
 
