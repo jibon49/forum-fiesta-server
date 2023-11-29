@@ -4,7 +4,7 @@ const cors = require('cors');
 require('dotenv').config()
 const jwt = require('jsonwebtoken')
 const port = process.env.PORT || 5000;
-
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 //middleware
 app.use(cors());
@@ -73,11 +73,11 @@ async function run() {
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
       console.log(email)
-      const query = {userMail:email};
+      const query = { userMail: email };
       const user = await userCollection.findOne(query);
       const isAdmin = user?.userRole === 'admin';
-      if(!isAdmin){
-        return res.status(403).send({message:'forbidden access'});
+      if (!isAdmin) {
+        return res.status(403).send({ message: 'forbidden access' });
       }
       next();
     }
@@ -224,6 +224,38 @@ async function run() {
       }
 
     })
+
+
+
+    // stripe
+    app.post('/create-payment-intent', async (req, res) => {
+      const {price} = req.body;
+      console.log(price)
+      const amount = parseInt(price * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      })
+
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+
+    })
+
+    app.patch('/payments/:email', async (req, res) => {
+      const email = req.params.email;
+      const filter = { userMail: email };
+      const updatedDoc = {
+        $set: {
+          membership: 'gold'
+        }
+      }
+      const result = await userCollection.updateOne(filter, updatedDoc)
+      res.send(result);
+    });
+    
 
 
 
