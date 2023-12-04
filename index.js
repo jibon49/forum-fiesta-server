@@ -12,7 +12,7 @@ app.use(express.json());
 
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const uri = `mongodb+srv://${process.env.DB_user}:${process.env.DB_PASSWORD}@cluster0.2zvoo0z.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.2zvoo0z.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -31,7 +31,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
 
 
@@ -40,6 +40,7 @@ async function run() {
     const userCollection = client.db("forumFiestaUsers").collection("users")
     const commentCollection = client.db("forumFiesta").collection("comments")
     const announcementCollection = client.db("forumFiesta").collection("announcement")
+    const reportedCommentCollection = client.db("forumFiesta").collection("reported")
 
 
     //JWT related
@@ -88,6 +89,30 @@ async function run() {
       const result = await postCollection.find().toArray();
       res.send(result)
     })
+
+    
+
+    app.get('/posts/sort', async (req, res) => {
+
+      try {
+        const result = await postCollection.aggregate([
+          {
+            $addFields: {
+              voteDifference: { $subtract: ['$votesCount.upvotes', '$votesCount.downvotes'] }
+            }
+          },
+          {
+            $sort: { voteDifference: -1 }
+          }
+        ]).toArray();
+
+        res.send(result);
+      } catch (error) {
+        console.error('Error fetching posts:', error);
+        res.status(500).send('Internal Server Error');
+      }
+
+    });
 
     app.post('/ad-post', async (req, res) => {
       const post = req.body
@@ -163,6 +188,12 @@ async function run() {
       res.send(result)
     })
 
+    app.post('/tags', async(req,res)=>{
+      const tag = req.body;
+      const result = await tagCollection.insertOne(tag)
+      res.send(result)
+    })
+
 
 
     // user related
@@ -193,15 +224,15 @@ async function run() {
       const email = req.params.email;
       const query = { userMail: email };
       const user = await userCollection.findOne(query);
-    
+
       if (user) {
-        const  membership  = user.membership;
+        const membership = user.membership;
         res.send({ membership });
       } else {
         res.status(404).send({ error: 'User not found' });
       }
     });
-    
+
 
     app.get('/users/admin/:email', verifyToken, async (req, res) => {
       const email = req.params.email;
@@ -232,10 +263,16 @@ async function run() {
 
 
 
+
     // comments related
     app.post('/comments', async (req, res) => {
       const comment = req.body;
       const result = await commentCollection.insertOne(comment)
+      res.send(result)
+    })
+
+    app.get('/allComments', async (req, res) => {
+      const result = await commentCollection.find().toArray()
       res.send(result)
     })
 
@@ -251,6 +288,43 @@ async function run() {
       }
 
     })
+
+    app.post('/comments/reported/:id', async (req, res) => {
+      const report = req.body;
+      const result = await reportedCommentCollection.insertOne(report)
+      res.send(result)
+    })
+
+    app.get('/comments/reported', async (req, res) => {
+      const result = await reportedCommentCollection.find().toArray()
+      res.send(result)
+    })
+
+
+    app.delete('/comments/:id', async (req, res) => {
+      const id = req.params.id;
+      console.log(id)
+      const query = { _id: new ObjectId(id) }
+      const result = await commentCollection.deleteOne(query);
+      res.send(result)
+    })
+
+
+    app.delete('/comments/reported/:id', async (req, res) => {
+      const id = req.params.id;
+      console.log(id)
+      const query = { _id: new ObjectId(id) }
+      const result = await reportedCommentCollection.deleteOne(query);
+      res.send(result)
+    })
+
+
+
+
+
+
+
+
 
 
     //announcement
